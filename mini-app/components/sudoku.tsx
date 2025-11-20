@@ -98,6 +98,8 @@ function shuffle<T>(array: T[]): void {
 export function Sudoku() {
   const [puzzle, setPuzzle] = useState<number[][]>([]);
   const [solution, setSolution] = useState<number[][]>([]);
+  const [original, setOriginal] = useState<number[][]>([]);
+  const [errorCells, setErrorCells] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string>("");
 
   useEffect(() => {
@@ -105,31 +107,59 @@ export function Sudoku() {
     const sol = newPuzzle.map(row => [...row]);
     setPuzzle(newPuzzle);
     setSolution(sol);
+    setOriginal(newPuzzle.map(row => [...row]));
   }, []);
 
   const handleChange = (row: number, col: number, value: string) => {
+    if (original[row][col] !== EMPTY) return; // fixed clue
     const num = parseInt(value, 10);
     if (isNaN(num) || num < 1 || num > 9) return;
     const newPuzzle = puzzle.map(r => [...r]);
     newPuzzle[row][col] = num;
     setPuzzle(newPuzzle);
+    setErrorCells(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(`${row}-${col}`);
+      return newSet;
+    });
   };
 
   const checkSolution = () => {
+    const newErrors = new Set<string>();
     for (let r = 0; r < SIZE; r++) {
       for (let c = 0; c < SIZE; c++) {
         if (puzzle[r][c] !== solution[r][c]) {
-          setMessage("Try again!");
-          return;
+          newErrors.add(`${r}-${c}`);
         }
       }
     }
-    setMessage("You are genius!");
+    if (newErrors.size > 0) {
+      setErrorCells(newErrors);
+      setMessage("Try again!");
+    } else {
+      setErrorCells(new Set());
+      setMessage("You are genius!");
+    }
+  };
+
+  const getCellClass = (row: number, col: number, value: number) => {
+    const base = cn(
+      "w-10 h-10 text-center border-0 appearance-none",
+      row % 3 === 0 && "border-t-4",
+      col % 3 === 0 && "border-l-4",
+      row === SIZE - 1 && "border-b-4",
+      col === SIZE - 1 && "border-r-4",
+      value !== EMPTY && "font-bold",
+      original[row][col] !== EMPTY && "bg-gray-200",
+      original[row][col] === EMPTY && "bg-white",
+      errorCells.has(`${row}-${col}`) && "text-red-600"
+    );
+    return base;
   };
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="grid grid-cols-9 gap-1">
+      <div className="grid grid-cols-9 gap-0">
         {puzzle.map((row, r) =>
           row.map((cell, c) => (
             <Input
@@ -139,7 +169,7 @@ export function Sudoku() {
               max={9}
               value={cell === EMPTY ? "" : cell}
               onChange={e => handleChange(r, c, e.target.value)}
-              className={cn("w-10 h-10 text-center", cell !== EMPTY && "bg-muted")}
+              className={getCellClass(r, c, cell)}
             />
           ))
         )}
